@@ -1,0 +1,43 @@
+#!/bin/bash
+#Export proxy here if you so that this script can send message to slack.
+#export http_proxy=
+#export https_proxy=
+#save the hostnames or ip addresses of all the nodes in this file. One name per line.
+node=`cat all` 
+#result 1 means pass 0 means fail.
+result=1 
+#Channel where the bot needs to send the message.
+channel_name="test"
+#Replace with the name of your enviroment. This is used in the message send to slack.
+env_name="ENV1"
+#Delete the file ping-failed which might be created by earlier execution of the script. 
+rm ping-failed
+for i in $node;do
+        ping -c 1 $i > /dev/null 2>&1;
+        if [ "$?" = "0" ]; then
+                if [ "$result" = "0" ];then
+                        echo ping had failed earlier
+                        result=0
+                fi
+        else
+                echo $i ping failed
+                #storing the failed nodes to file named ping-failed
+		echo $i >> ping-failed
+		result=0
+        fi
+done
+#Failed nodes to be displayed message
+if [ "$result" = "1" ];then
+        echo ping passed
+	#json used to send message to slack channel from your slackbot if all nodes in the cluster can be pinged.
+	echo '{"channel":"'${channel_name}'","text":"*'${env_name}' : PING* - OK", "username" :"cisco"}'  > ping-mesg.txt
+	curl -X POST -H 'Authorization: Bearer replace with token from slack' -H 'Content-type: application/json' --data '@ping-mesg.txt' https://slack.com/api/chat.postMessage
+else
+        echo ping failed
+	#Failed nodes to be displayed message
+	failednodes=`cat ping-failed`
+	echo $failednodes
+	#json used to send message to slack channel from your slackbot if one or more nodes in the cluster cannot be pinged.
+	echo '{"channel":"'${channel_name}'","text":"*'${env_name}' : PING* - Failed on *'${failednodes}'*", "username" :"cisco"}'  > ping-mesg.txt
+	curl -X POST -H 'Authorization: Bearer replace with token from slack' -H 'Content-type: application/json' --data '@ping-mesg.txt' https://slack.com/api/chat.postMessage
+fi
