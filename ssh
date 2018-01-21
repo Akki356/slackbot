@@ -1,0 +1,49 @@
+#!/bin/bash
+#Export proxy here if you so that this script can send message to slack.
+#export http_proxy=
+#export https_proxy=
+#save the hostnames or ip addresses of all the nodes in this file. One name per line.
+node=`cat all`
+#username used to ssh the nodes in the cluster. Replace username user with you username
+user="user"
+#users keylocation. Replace username user with you username.
+key_location="/home/user/.ssh/id_rsa"
+#result 1 means pass 0 means fail
+result=1
+#Channel where the bot needs to send the message. 
+channel_name="test"
+#Replace with the name of your enviroment. This is used in the message send to slack.
+env_name="JPE1"
+#Delete the file ssh-failed which might be created by earlier execution of the script.
+rm ssh-failed
+for i in $node;do
+	#StrictHostKeyChecking is set to no so that we donot need to forfully add the .ssh/known_hosts file, also we donot need to press yes when the script tries to ssh into the node.
+        ssh -q -o StrictHostKeyChecking=no -i $key_location $user@$i 'touch tmp'
+        if [ "$?" = "0" ]; then
+                echo $i ssh is fine
+                if [ "$result" = "0" ];then
+                        echo ssh had failed earlier
+                        result=0
+                        echo result unchanged result $result
+                fi
+        else
+                echo $i ssh failed
+		echo $i >> ssh-failed
+                result=0
+                echo result $result
+        fi
+done
+if [ "$result" = "1" ];then
+        echo ssh passed
+	#json used to send message to slack channel from your slackbot if all nodes in the cluster are sshable.
+	echo '{"channel":"'${channel_name}'","text":"*'${env_name}' : SSH* - OK", "username" :"cisco"}'  > ssh-mesg.txt
+        curl -X POST -H 'Authorization: Bearer replace with token from slack' -H 'Content-type: application/json' --data '@ssh-mesg.txt' https://slack.com/api/chat.postMessage
+else
+        echo ssh failed
+	#Failed nodes to be displayed message
+	failednodes=`cat ssh-failed`
+	echo $failednodes
+	#json used to send message to slack channel from your slackbot if all nodes in the cluster are sshable.
+	echo '{"channel":"'${channel_name}'","text":"*'${env_name}' : SSH* - Failed on *'${failednodes}'*", "username" :"cisco"}'  > ssh-mesg.txt
+        curl -X POST -H 'Authorization: Bearer replace with token from slack' -H 'Content-type: application/json' --data '@ssh-mesg.txt' https://slack.com/api/chat.postMessage
+fi
