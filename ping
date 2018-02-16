@@ -1,5 +1,5 @@
 #!/bin/bash
-#Export proxy here if you so that this script can send message to slack.
+#Export proxy here so that this script can send message to slack.
 #export http_proxy=
 #export https_proxy=
 #save the hostnames or ip addresses of all the nodes in this file. One name per line.
